@@ -28,7 +28,9 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // Database
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+// Try to get connection string from environment variable first, then from configuration
+var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+                        ?? builder.Configuration.GetConnectionString("DefaultConnection")
                         ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured.");
 builder.Services.AddDbContext<BookstoreContext>(options =>
     options.UseNpgsql(connectionString));
@@ -46,8 +48,10 @@ builder.Services.AddCors(options =>
 });
 
 // Add JWT Authentication
-var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-var secretKey = jwtSettings["SecretKey"] ?? "YourSuperSecretKeyMinimum32CharactersLong!";
+// Try to get JWT secret from environment variable first, then from configuration
+var secretKey = Environment.GetEnvironmentVariable("JwtSettings__SecretKey")
+                ?? builder.Configuration.GetSection("JwtSettings")["SecretKey"]
+                ?? throw new InvalidOperationException("JWT SecretKey is not configured.");
 
 builder.Services.AddAuthentication(options =>
 {
