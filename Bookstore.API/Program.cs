@@ -31,14 +31,6 @@ builder.Services.AddSwaggerGen();
 // Parse Render's DATABASE_URL or use ConnectionStrings__DefaultConnection
 var connectionString = GetConnectionString(builder.Configuration);
 
-// Log connection info (without sensitive data)
-var logger = builder.Services.BuildServiceProvider().GetRequiredService<ILogger<Program>>();
-if (connectionString.Contains("Host="))
-{
-    var host = connectionString.Split("Host=")[1].Split(';')[0];
-    logger.LogInformation("Connecting to database host: {Host}", host);
-}
-
 builder.Services.AddDbContext<BookstoreContext>(options =>
     options.UseNpgsql(connectionString));
 
