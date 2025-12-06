@@ -30,6 +30,15 @@ builder.Services.AddSwaggerGen();
 // Database
 // Parse Render's DATABASE_URL or use ConnectionStrings__DefaultConnection
 var connectionString = GetConnectionString(builder.Configuration);
+
+// Log connection info (without sensitive data)
+var logger = builder.Services.BuildServiceProvider().GetRequiredService<ILogger<Program>>();
+if (connectionString.Contains("Host="))
+{
+    var host = connectionString.Split("Host=")[1].Split(';')[0];
+    logger.LogInformation("Connecting to database host: {Host}", host);
+}
+
 builder.Services.AddDbContext<BookstoreContext>(options =>
     options.UseNpgsql(connectionString));
 
@@ -99,11 +108,31 @@ builder.Services.AddScoped<DeleteGenreUseCase>();
 
 var app = builder.Build();
 
-// Seed the database
+// Apply migrations and seed the database
 using (var scope = app.Services.CreateScope())
 {
-    var context = scope.ServiceProvider.GetRequiredService<BookstoreContext>();
-    await DataSeeder.SeedAsync(context);
+    var services = scope.ServiceProvider;
+    var logger = services.GetRequiredService<ILogger<Program>>();
+
+    try
+    {
+        var context = services.GetRequiredService<BookstoreContext>();
+
+        // Apply pending migrations
+        logger.LogInformation("Applying database migrations...");
+        await context.Database.MigrateAsync();
+        logger.LogInformation("Database migrations applied successfully.");
+
+        // Seed the database
+        logger.LogInformation("Seeding database...");
+        await DataSeeder.SeedAsync(context);
+        logger.LogInformation("Database seeded successfully.");
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "An error occurred while migrating or seeding the database.");
+        throw;
+    }
 }
 
 // Configure the HTTP request pipeline
@@ -136,13 +165,32 @@ static string GetConnectionString(IConfiguration configuration)
 
     if (!string.IsNullOrEmpty(databaseUrl))
     {
-        // Parse the DATABASE_URL into Npgsql connection string format
-        var uri = new Uri(databaseUrl);
-        var db = uri.AbsolutePath.TrimStart('/');
-        var userInfo = uri.UserInfo.Split(':');
+        try
+        {
+            // Parse the DATABASE_URL into Npgsql connection string format
+            var uri = new Uri(databaseUrl);
+            var db = uri.AbsolutePath.Trim('/');
 
-        // Build connection string with properly decoded credentials
-        return $"Host={uri.Host};Port={uri.Port};Database={db};Username={Uri.UnescapeDataString(userInfo[0])};Password={Uri.UnescapeDataString(userInfo[1])};SSL Mode=Require;Trust Server Certificate=true";
+            // Split user info and decode properly
+            var userInfo = uri.UserInfo.Split(':', 2); // Limit to 2 parts in case password contains ':'
+
+            if (userInfo.Length != 2)
+            {
+                throw new InvalidOperationException("Invalid DATABASE_URL format: missing username or password");
+            }
+
+            var username = Uri.UnescapeDataString(userInfo[0]);
+            var password = Uri.UnescapeDataString(userInfo[1]);
+
+            // Build connection string with properly decoded credentials
+            var connStr = $"Host={uri.Host};Port={uri.Port};Database={db};Username={username};Password={password};SSL Mode=Require;Trust Server Certificate=true";
+
+            return connStr;
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to parse DATABASE_URL: {ex.Message}", ex);
+        }
     }
 
     // Fallback to ConnectionStrings__DefaultConnection or appsettings.json
