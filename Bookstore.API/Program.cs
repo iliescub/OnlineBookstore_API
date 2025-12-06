@@ -28,10 +28,8 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // Database
-// Try to get connection string from environment variable first, then from configuration
-var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
-                        ?? builder.Configuration.GetConnectionString("DefaultConnection")
-                        ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured.");
+// Parse Render's DATABASE_URL or use ConnectionStrings__DefaultConnection
+var connectionString = GetConnectionString(builder.Configuration);
 builder.Services.AddDbContext<BookstoreContext>(options =>
     options.UseNpgsql(connectionString));
 
@@ -129,3 +127,26 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+// Helper method to parse database connection string
+static string GetConnectionString(IConfiguration configuration)
+{
+    // First, try to get DATABASE_URL (Render's format)
+    var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
+
+    if (!string.IsNullOrEmpty(databaseUrl))
+    {
+        // Parse the DATABASE_URL into Npgsql connection string format
+        var uri = new Uri(databaseUrl);
+        var db = uri.AbsolutePath.TrimStart('/');
+        var userInfo = uri.UserInfo.Split(':');
+
+        // Build connection string with properly decoded credentials
+        return $"Host={uri.Host};Port={uri.Port};Database={db};Username={Uri.UnescapeDataString(userInfo[0])};Password={Uri.UnescapeDataString(userInfo[1])};SSL Mode=Require;Trust Server Certificate=true";
+    }
+
+    // Fallback to ConnectionStrings__DefaultConnection or appsettings.json
+    return Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+           ?? configuration.GetConnectionString("DefaultConnection")
+           ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured.");
+}
