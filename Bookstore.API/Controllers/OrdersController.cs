@@ -132,42 +132,30 @@ public class OrdersController : ControllerBase
     [HttpPatch("{orderId}/complete")]
     [Authorize(Roles = "admin")]
     public async Task<IActionResult> CompleteOrder(string orderId)
-    {
-        try
-        {
-            var success = await _completeOrderUseCase.ExecuteAsync(orderId);
-
-            if (!success)
-            {
-                return NotFound(new { error = "Order not found" });
-            }
-
-            return Ok(new { message = "Order marked as completed" });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { error = ex.Message });
-        }
-        catch (Exception)
-        {
-            return StatusCode(500, new { error = "An error occurred while completing the order" });
-        }
-    }
+        => await ExecuteOrderStatusUpdate(
+            () => _completeOrderUseCase.ExecuteAsync(orderId),
+            "Order marked as completed",
+            "completing");
 
     [HttpPatch("{orderId}/close")]
     [Authorize(Roles = "admin")]
     public async Task<IActionResult> CloseOrder(string orderId)
+        => await ExecuteOrderStatusUpdate(
+            () => _closeOrderUseCase.ExecuteAsync(orderId),
+            "Order marked as closed (delivery confirmed)",
+            "closing");
+
+    private async Task<IActionResult> ExecuteOrderStatusUpdate(
+        Func<Task<bool>> operation,
+        string successMessage,
+        string operationName)
     {
         try
         {
-            var success = await _closeOrderUseCase.ExecuteAsync(orderId);
-
-            if (!success)
-            {
-                return NotFound(new { error = "Order not found" });
-            }
-
-            return Ok(new { message = "Order marked as closed (delivery confirmed)" });
+            var success = await operation();
+            return success
+                ? Ok(new { message = successMessage })
+                : NotFound(new { error = "Order not found" });
         }
         catch (InvalidOperationException ex)
         {
@@ -175,7 +163,7 @@ public class OrdersController : ControllerBase
         }
         catch (Exception)
         {
-            return StatusCode(500, new { error = "An error occurred while closing the order" });
+            return StatusCode(500, new { error = $"An error occurred while {operationName} the order" });
         }
     }
 }
