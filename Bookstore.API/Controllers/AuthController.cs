@@ -1,11 +1,13 @@
 using BookstoreAPI.Application.DTOs.Requests;
 using BookstoreAPI.Application.UseCases.Auth;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace BookstoreAPI.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[EnableRateLimiting("auth")]
 public class AuthController : ControllerBase
 {
     private readonly LoginUseCase _loginUseCase;

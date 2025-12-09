@@ -1,12 +1,14 @@
 using BookstoreAPI.Application.UseCases.Users;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace BookstoreAPI.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Roles = "admin")]
+[EnableRateLimiting("api")]
 public class UsersController : ControllerBase
 {
     private readonly GetAllUsersUseCase _getAllUsersUseCase;

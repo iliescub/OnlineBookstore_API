@@ -2,11 +2,13 @@ using BookstoreAPI.Application.DTOs.Requests;
 using BookstoreAPI.Application.UseCases.Books;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace BookstoreAPI.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[EnableRateLimiting("api")]
 public class BooksController : ControllerBase
 {
     private readonly GetAllBooksUseCase _getAllBooksUseCase;

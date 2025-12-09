@@ -29,13 +29,8 @@ public class GetOrdersByUserIdUseCase
             order.Total,
             order.Date,
             order.Status,
-            order.PaymentInfo != null ? new PaymentInfoResponse(
-                order.PaymentInfo.CardNumber,
-                order.PaymentInfo.CardName,
-                order.PaymentInfo.Expiry,
-                order.PaymentInfo.Cvv,
-                order.PaymentInfo.Address
-            ) : null
+            order.PaymentProviderId,
+            order.ShippingAddress
         ));
     }
 }

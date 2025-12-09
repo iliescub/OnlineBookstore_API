@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,6 +27,48 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// Add Rate Limiting
+builder.Services.AddRateLimiter(options =>
+{
+    // Global rate limiting policy - 100 requests per minute per IP
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: partition => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 100,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    // Strict policy for authentication endpoints - 5 attempts per 15 minutes per IP
+    options.AddPolicy("auth", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: partition => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(15),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    // Standard policy for API endpoints - 30 requests per minute per IP
+    options.AddPolicy("api", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: partition => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+});
 
 // Database
 // Parse Render's DATABASE_URL or use ConnectionStrings__DefaultConnection
@@ -90,6 +133,9 @@ builder.Services.AddScoped<DeleteBookUseCase>();
 builder.Services.AddScoped<GetAllOrdersUseCase>();
 builder.Services.AddScoped<GetOrdersByUserIdUseCase>();
 builder.Services.AddScoped<CreateOrderUseCase>();
+builder.Services.AddScoped<CancelOrderUseCase>();
+builder.Services.AddScoped<CompleteOrderUseCase>();
+builder.Services.AddScoped<CloseOrderUseCase>();
 builder.Services.AddScoped<GetAllUsersUseCase>();
 builder.Services.AddScoped<DeleteUserUseCase>();
 builder.Services.AddScoped<GetAllGenresUseCase>();
@@ -99,33 +145,6 @@ builder.Services.AddScoped<UpdateGenreUseCase>();
 builder.Services.AddScoped<DeleteGenreUseCase>();
 
 var app = builder.Build();
-
-// Apply migrations and seed the database
-using (var scope = app.Services.CreateScope())
-{
-    var services = scope.ServiceProvider;
-    var logger = services.GetRequiredService<ILogger<Program>>();
-
-    try
-    {
-        var context = services.GetRequiredService<BookstoreContext>();
-
-        // Apply pending migrations
-        logger.LogInformation("Applying database migrations...");
-        await context.Database.MigrateAsync();
-        logger.LogInformation("Database migrations applied successfully.");
-
-        // Seed the database
-        logger.LogInformation("Seeding database...");
-        await DataSeeder.SeedAsync(context);
-        logger.LogInformation("Database seeded successfully.");
-    }
-    catch (Exception ex)
-    {
-        logger.LogError(ex, "An error occurred while migrating or seeding the database.");
-        throw;
-    }
-}
 
 // Configure the HTTP request pipeline
 // Enable Swagger in all environments for testing
@@ -142,6 +161,10 @@ else
 {
     app.UseHttpsRedirection();
 }
+
+// Enable rate limiting middleware (must be before UseAuthentication/UseAuthorization)
+app.UseRateLimiter();
+
 app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();

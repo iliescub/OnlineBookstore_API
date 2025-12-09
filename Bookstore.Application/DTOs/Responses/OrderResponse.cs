@@ -8,7 +8,8 @@ public record OrderResponse(
     decimal Total,
     DateTime Date,
     string Status,
-    PaymentInfoResponse? PaymentInfo);
+    string? PaymentProviderId,
+    string? ShippingAddress);
 
 public record OrderItemResponse(
     string Id,
@@ -16,10 +17,3 @@ public record OrderItemResponse(
     string Author,
     decimal Price,
     int Quantity);
-
-public record PaymentInfoResponse(
-    string CardNumber,
-    string CardName,
-    string Expiry,
-    string Cvv,
-    string Address);

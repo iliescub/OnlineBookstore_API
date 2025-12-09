@@ -58,6 +58,8 @@ public class BookstoreContext : DbContext
             entity.Property(o => o.Status).HasMaxLength(32).IsRequired();
             entity.Property(o => o.Total).HasColumnType("decimal(10,2)");
             entity.Property(o => o.Date).HasColumnName("OrderDate").HasDefaultValueSql("NOW()");
+            entity.Property(o => o.PaymentProviderId).HasMaxLength(100);
+            entity.Property(o => o.ShippingAddress).HasMaxLength(512);
 
             // Ignore the public Items property since it's read-only
             entity.Ignore(o => o.Items);
@@ -72,19 +74,10 @@ public class BookstoreContext : DbContext
                           : JsonSerializer.Deserialize<List<OrderItem>>(v, SerializerOptions) ?? new List<OrderItem>()
                   )
                   .Metadata.SetValueComparer(new ValueComparer<List<OrderItem>>(
-                      (c1, c2) => c1.SequenceEqual(c2),
-                      c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
-                      c => c.ToList()
+                      (c1, c2) => (c1 == null && c2 == null) || (c1 != null && c2 != null && c1.SequenceEqual(c2)),
+                      c => c == null ? 0 : c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                      c => c == null ? new List<OrderItem>() : c.ToList()
                   ));
-
-            entity.OwnsOne(o => o.PaymentInfo, owned =>
-            {
-                owned.Property(p => p.CardNumber).HasColumnName("CardNumber").HasMaxLength(64);
-                owned.Property(p => p.CardName).HasColumnName("CardName").HasMaxLength(128);
-                owned.Property(p => p.Expiry).HasColumnName("Expiry").HasMaxLength(16);
-                owned.Property(p => p.Cvv).HasColumnName("Cvv").HasMaxLength(8);
-                owned.Property(p => p.Address).HasColumnName("Address").HasMaxLength(256);
-            });
 
             entity.HasOne<User>()
                   .WithMany()

@@ -29,7 +29,8 @@ public class BookRepository : IBookRepository
 
     public async Task<Book?> GetByIdAsync(string id)
     {
-        return await _context.Books.AsNoTracking().FirstOrDefaultAsync(b => b.Id == id);
+        // Remove AsNoTracking to allow EF Core to track changes for updates
+        return await _context.Books.FirstOrDefaultAsync(b => b.Id == id);
     }
 
     public async Task AddAsync(Book book)

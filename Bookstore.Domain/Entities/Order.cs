@@ -10,7 +10,8 @@ public class Order
     public decimal Total { get; private set; }
     public DateTime Date { get; private set; }
     public string Status { get; private set; }
-    public PaymentInfo? PaymentInfo { get; private set; }
+    public string? PaymentProviderId { get; private set; }
+    public string? ShippingAddress { get; private set; }
 
     private Order()
     {
@@ -20,7 +21,7 @@ public class Order
         Status = string.Empty;
     }
 
-    public Order(string userId, string userName, List<OrderItem> items, PaymentInfo? paymentInfo = null)
+    public Order(string userId, string userName, List<OrderItem> items, string? shippingAddress = null)
     {
         if (string.IsNullOrWhiteSpace(userId))
             throw new ArgumentException("User ID cannot be empty", nameof(userId));
@@ -34,8 +35,8 @@ public class Order
         UserName = userName;
         _items = items;
         Date = DateTime.UtcNow;
-        Status = "completed";
-        PaymentInfo = paymentInfo;
+        Status = "pending";
+        ShippingAddress = shippingAddress;
 
         CalculateTotal();
     }
@@ -72,9 +73,20 @@ public class Order
         Total = _items.Sum(item => item.Price * item.Quantity);
     }
 
-    public void SetPaymentInfo(PaymentInfo paymentInfo)
+    public void SetPaymentProviderId(string paymentProviderId)
     {
-        PaymentInfo = paymentInfo ?? throw new ArgumentNullException(nameof(paymentInfo));
+        if (string.IsNullOrWhiteSpace(paymentProviderId))
+            throw new ArgumentException("Payment provider ID cannot be empty", nameof(paymentProviderId));
+
+        PaymentProviderId = paymentProviderId;
+    }
+
+    public void SetShippingAddress(string shippingAddress)
+    {
+        if (string.IsNullOrWhiteSpace(shippingAddress))
+            throw new ArgumentException("Shipping address cannot be empty", nameof(shippingAddress));
+
+        ShippingAddress = shippingAddress;
     }
 }
 
@@ -117,37 +129,5 @@ public class OrderItem
             throw new ArgumentException("Quantity must be greater than zero", nameof(quantity));
 
         Quantity = quantity;
-    }
-}
-
-public class PaymentInfo
-{
-    public string CardNumber { get; private set; }
-    public string CardName { get; private set; }
-    public string Expiry { get; private set; }
-    public string Cvv { get; private set; }
-    public string Address { get; private set; }
-
-    private PaymentInfo()
-    {
-        CardNumber = string.Empty;
-        CardName = string.Empty;
-        Expiry = string.Empty;
-        Cvv = string.Empty;
-        Address = string.Empty;
-    }
-
-    public PaymentInfo(string cardNumber, string cardName, string expiry, string cvv, string address)
-    {
-        if (string.IsNullOrWhiteSpace(cardNumber))
-            throw new ArgumentException("Card number cannot be empty", nameof(cardNumber));
-        if (string.IsNullOrWhiteSpace(cardName))
-            throw new ArgumentException("Card name cannot be empty", nameof(cardName));
-
-        CardNumber = cardNumber;
-        CardName = cardName;
-        Expiry = expiry;
-        Cvv = cvv;
-        Address = address;
     }
 }

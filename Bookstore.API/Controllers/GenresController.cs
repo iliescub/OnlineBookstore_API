@@ -2,11 +2,13 @@ using BookstoreAPI.Application.DTOs.Requests;
 using BookstoreAPI.Application.UseCases.Genres;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace BookstoreAPI.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[EnableRateLimiting("api")]
 public class GenresController : ControllerBase
 {
     private readonly GetAllGenresUseCase _getAllGenresUseCase;
